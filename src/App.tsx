@@ -31,7 +31,6 @@ export const App: React.FC = () => {
     stopListening,
     resetTranscript,
     setLanguage,
-    currentLanguage,
   } = useSpeechRecognition();
 
   const { speak, stop: stopSpeaking, speakingId } = useSpeechSynthesis();
@@ -172,8 +171,6 @@ export const App: React.FC = () => {
           interimTranscript={interimTranscript}
           finalTranscript={transcript}
           errorMessage={speechError}
-          currentLanguage={currentLanguage}
-          onSelectLanguage={setLanguage}
         />
       ) : (
         <>

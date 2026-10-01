@@ -1,7 +1,6 @@
 import React, { useState, FormEvent, KeyboardEvent, useEffect } from 'react';
 import { Mic, MicOff, Send, MessageSquare, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { SahaLogo } from './SahaLogo';
-import { SUPPORTED_SPEECH_LANGUAGES } from '../hooks/useSpeechRecognition';
 
 interface InitialScreenProps {
   onSendMessage: (text: string) => void;
@@ -11,8 +10,6 @@ interface InitialScreenProps {
   interimTranscript: string;
   finalTranscript?: string;
   errorMessage: string | null;
-  currentLanguage?: string;
-  onSelectLanguage?: (langCode: string) => void;
 }
 
 export const InitialScreen: React.FC<InitialScreenProps> = ({
@@ -23,8 +20,6 @@ export const InitialScreen: React.FC<InitialScreenProps> = ({
   interimTranscript,
   finalTranscript = '',
   errorMessage,
-  currentLanguage = 'en-IN',
-  onSelectLanguage,
 }) => {
   const [inputText, setInputText] = useState('');
 
@@ -51,8 +46,12 @@ export const InitialScreen: React.FC<InitialScreenProps> = ({
   };
 
   // Live text display while listening or typing
+  const liveSpeech = interimTranscript
+    ? (finalTranscript ? `${finalTranscript} ${interimTranscript}` : interimTranscript)
+    : finalTranscript;
+
   const liveDisplayValue = isListening
-    ? (interimTranscript ? `${finalTranscript ? finalTranscript + ' ' : ''}${interimTranscript}` : (inputText || ''))
+    ? (liveSpeech || inputText)
     : inputText;
 
   return (
@@ -84,29 +83,6 @@ export const InitialScreen: React.FC<InitialScreenProps> = ({
         <div className="w-3 h-3 bg-[#EEF2FF] transform rotate-45 absolute -bottom-1.5 left-8" />
       </div>
 
-      {/* Quick Speech Language Bar */}
-      {onSelectLanguage && (
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5 max-w-sm mx-auto">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">
-            Speak in:
-          </span>
-          {SUPPORTED_SPEECH_LANGUAGES.slice(0, 5).map((lang) => (
-            <button
-              key={lang.code}
-              type="button"
-              onClick={() => onSelectLanguage(lang.code)}
-              className={`text-xs font-semibold px-3 py-1 rounded-full transition-all min-h-[30px] touch-manipulation ${
-                currentLanguage === lang.code
-                  ? 'bg-[#5448C8] text-white shadow-xs font-bold'
-                  : 'bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200'
-              }`}
-            >
-              {lang.label}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Active Listening Indicator with Live Voice Wave & Streamed Text */}
       {isListening && (
         <div className="w-full mt-6 p-4 bg-indigo-50 border-2 border-indigo-400 rounded-3xl animate-pulse text-indigo-950 shadow-md">
@@ -125,7 +101,7 @@ export const InitialScreen: React.FC<InitialScreenProps> = ({
           </div>
 
           <p className="mt-3 text-base sm:text-lg font-bold text-[#1E1B4B] min-h-[32px] bg-white/80 py-2 px-4 rounded-2xl border border-indigo-200/80 shadow-2xs">
-            {interimTranscript || finalTranscript || 'Speak now... your words will appear here live'}
+            {liveSpeech || 'Speak now... your words will appear here live'}
           </p>
         </div>
       )}

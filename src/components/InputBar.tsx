@@ -45,8 +45,12 @@ export const InputBar: React.FC<InputBarProps> = ({
   };
 
   // Live text display while listening or typing
+  const liveSpeech = interimTranscript
+    ? (finalTranscript ? `${finalTranscript} ${interimTranscript}` : interimTranscript)
+    : finalTranscript;
+
   const liveDisplayValue = isListening
-    ? (interimTranscript ? `${finalTranscript ? finalTranscript + ' ' : ''}${interimTranscript}` : (inputText || ''))
+    ? (liveSpeech || inputText)
     : inputText;
 
   return (

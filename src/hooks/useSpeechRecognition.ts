@@ -170,22 +170,25 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
         maxSilenceTimerRef.current = null;
       }
 
-      let interim = '';
-      let finalChunk = '';
+      let fullFinal = '';
+      let fullInterim = '';
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
+      for (let i = 0; i < event.results.length; ++i) {
         const item = event.results[i];
         if (item.isFinal) {
-          finalChunk += item[0].transcript;
+          fullFinal += item[0].transcript + ' ';
         } else {
-          interim += item[0].transcript;
+          fullInterim += item[0].transcript;
         }
       }
 
-      if (finalChunk) {
-        setTranscript((prev) => (prev ? `${prev} ${finalChunk}`.trim() : finalChunk.trim()));
+      const cleanFinal = fullFinal.trim();
+      const cleanInterim = fullInterim.trim();
+
+      if (cleanFinal) {
+        setTranscript(cleanFinal);
       }
-      setInterimTranscript(interim);
+      setInterimTranscript(cleanInterim);
 
       // Auto-stop when user finishes speaking (1.8s of silence after speech)
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -205,7 +208,6 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
 
       // Handle benign silence without alarming the user
       if (errorCode === 'no-speech') {
-        // Continuous mode handles silence gracefully; ignore
         return;
       }
 
@@ -264,11 +266,11 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       return;
     }
 
-    // Step A: Request microphone hardware access and hold stream active during recording
+    // Step A: Request microphone hardware access and immediately release it so hardware is not locked
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        streamRef.current = stream;
+        stream.getTracks().forEach((track) => track.stop());
         setIsPermissionDenied(false);
       } catch (err: any) {
         isStartingRef.current = false;
