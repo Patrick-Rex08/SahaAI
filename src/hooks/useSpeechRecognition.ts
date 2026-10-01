@@ -61,6 +61,27 @@ const getInitialLanguage = (): string => {
   return 'en-IN';
 };
 
+export interface SpeechLanguageOption {
+  code: string;
+  label: string;
+  name: string;
+}
+
+export const SUPPORTED_SPEECH_LANGUAGES: SpeechLanguageOption[] = [
+  { code: 'en-IN', label: 'English', name: 'Indian English' },
+  { code: 'hi-IN', label: 'हिन्दी', name: 'Hindi' },
+  { code: 'ta-IN', label: 'தமிழ்', name: 'Tamil' },
+  { code: 'te-IN', label: 'తెలుగు', name: 'Telugu' },
+  { code: 'bn-IN', label: 'বাংলা', name: 'Bengali' },
+  { code: 'mr-IN', label: 'मराठी', name: 'Marathi' },
+  { code: 'gu-IN', label: 'ગુજરાતી', name: 'Gujarati' },
+  { code: 'kn-IN', label: 'ಕನ್ನಡ', name: 'Kannada' },
+  { code: 'ml-IN', label: 'മലയാളം', name: 'Malayalam' },
+  { code: 'pa-IN', label: 'ਪੰਜਾਬੀ', name: 'Punjabi' },
+  { code: 'or-IN', label: 'ଓଡ଼ିଆ', name: 'Odia' },
+  { code: 'ur-IN', label: 'اردو', name: 'Urdu' },
+];
+
 export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHook => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -71,6 +92,7 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
   const [currentLanguage, setCurrentLanguage] = useState(initialLang || getInitialLanguage());
 
   const recognitionRef = useRef<any>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const isStartingRef = useRef(false);
   const silenceTimerRef = useRef<any>(null);
   const maxSilenceTimerRef = useRef<any>(null);
@@ -223,9 +245,9 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
     return recognition;
   }, [currentLanguage]);
 
-  // 3. User taps microphone to start listening (synchronous activation)
+  // 3. User taps microphone to start listening
   const startListening = useCallback(async () => {
-    if (isStartingRef.current || isListening) return;
+    if (isListening) return;
     isStartingRef.current = true;
 
     setErrorMessage(null);
@@ -242,7 +264,23 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       return;
     }
 
-    // Abort any leftover instance cleanly
+    // Step A: Request microphone hardware access and hold stream active during recording
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        setIsPermissionDenied(false);
+      } catch (err: any) {
+        isStartingRef.current = false;
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setIsPermissionDenied(true);
+          setErrorMessage('Microphone access was denied. Please allow microphone permission in your browser address bar.');
+          return;
+        }
+      }
+    }
+
+    // Step B: Abort any leftover instance cleanly
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
@@ -252,7 +290,7 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       recognitionRef.current = null;
     }
 
-    // Build fresh recognition instance and start listening immediately (synchronous user gesture)
+    // Step C: Build fresh recognition instance and start listening
     const recognition = buildRecognitionInstance();
     if (!recognition) {
       isStartingRef.current = false;
@@ -263,6 +301,7 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
 
     try {
       recognition.start();
+      isStartingRef.current = false;
     } catch (e: any) {
       isStartingRef.current = false;
       console.warn('SpeechRecognition start error:', e);
@@ -279,6 +318,14 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       } catch {
         // ignore
       }
+    }
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      } catch {
+        // ignore
+      }
+      streamRef.current = null;
     }
     setIsListening(false);
   }, []);

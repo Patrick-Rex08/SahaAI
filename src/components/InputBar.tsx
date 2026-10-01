@@ -31,7 +31,7 @@ export const InputBar: React.FC<InputBarProps> = ({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const trimmed = (inputText || interimTranscript).trim();
+    const trimmed = (inputText || interimTranscript || finalTranscript).trim();
     if (!trimmed || isLoading) return;
     onSendMessage(trimmed);
     setInputText('');
@@ -44,18 +44,23 @@ export const InputBar: React.FC<InputBarProps> = ({
     }
   };
 
+  // Live text display while listening or typing
+  const liveDisplayValue = isListening
+    ? (interimTranscript ? `${finalTranscript ? finalTranscript + ' ' : ''}${interimTranscript}` : (inputText || ''))
+    : inputText;
+
   return (
     <footer className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-indigo-50/80 p-3 sm:p-4 shadow-lg">
       <div className="max-w-2xl mx-auto">
-        {/* Real-time Listening Banner */}
+        {/* Real-time Listening Banner with Voice Wave */}
         {isListening && (
-          <div className="mb-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-2 animate-pulse text-indigo-950">
+          <div className="mb-2 p-2.5 bg-indigo-50 border border-indigo-300 rounded-2xl flex items-center justify-between gap-2 animate-pulse text-indigo-950">
             <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
               <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
               <span>Listening...</span>
             </div>
-            <span className="text-xs font-semibold text-slate-800">
-              {interimTranscript || 'Speak now...'}
+            <span className="text-xs font-bold text-[#1E1B4B]">
+              {interimTranscript || finalTranscript || 'Speak now...'}
             </span>
           </div>
         )}
@@ -80,7 +85,7 @@ export const InputBar: React.FC<InputBarProps> = ({
                 ? 'Listening... tap to stop'
                 : 'Tap to speak'
             }
-            aria-label={isListening ? 'Listening...' : 'Tap to speak'}
+            aria-label={isListening ? 'Stop listening' : 'Tap to speak'}
           >
             {isListening ? (
               <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -89,18 +94,18 @@ export const InputBar: React.FC<InputBarProps> = ({
             )}
           </button>
 
-          {/* Pill-shaped text input */}
-          <div className="relative flex-1 flex items-center bg-white border border-[#E0E7FF] focus-within:border-[#5448C8] rounded-full px-3 py-1 shadow-xs transition-all">
+          {/* Pill-shaped text input with live converting speech */}
+          <div className={`relative flex-1 flex items-center bg-white border ${isListening ? 'border-[#5448C8] ring-2 ring-indigo-200' : 'border-[#E0E7FF]'} focus-within:border-[#5448C8] rounded-full px-3 py-1 shadow-xs transition-all`}>
             <MessageSquare className="w-4 h-4 text-slate-400 mr-2 flex-shrink-0" />
             <input
               type="text"
-              value={inputText}
+              value={liveDisplayValue}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isLoading || isListening}
+              disabled={isLoading}
               placeholder={
                 isListening
-                  ? 'Listening to speech...'
+                  ? 'Converting speech live... speak now'
                   : 'Type your question here...'
               }
               className="w-full py-2.5 text-sm sm:text-base text-slate-900 placeholder-slate-400 bg-transparent outline-none"
