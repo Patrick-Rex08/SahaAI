@@ -1,4 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
+
+// Ensure .env variables are loaded server-side
+dotenv.config();
 
 const SAHA_SYSTEM_INSTRUCTION = `
 You are "Saha", an empathetic, respectful, and accessible AI citizen companion designed to help women across all of India understand and access government schemes, services, and opportunities independently.
@@ -82,9 +86,15 @@ export async function handleChatRequest(body: ChatRequestBody): Promise<{ text: 
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
+  const isValidApiKey =
+    apiKey &&
+    apiKey.trim() !== '' &&
+    apiKey !== 'YOUR_API_KEY_HERE' &&
+    apiKey !== 'your_gemini_api_key_here' &&
+    !apiKey.startsWith('YOUR_');
 
-  // 1. If GEMINI_API_KEY is available, use Gemini 2.5 Flash
-  if (apiKey && apiKey !== 'your_gemini_api_key_here' && apiKey.trim() !== '') {
+  // 1. If a valid GEMINI_API_KEY is configured, call Gemini 2.5 Flash
+  if (isValidApiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
 
