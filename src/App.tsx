@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
+import { AuthModal, UserProfile } from './components/AuthModal';
 import { InitialScreen } from './components/InitialScreen';
 import { ChatArea } from './components/ChatArea';
 import { InputBar } from './components/InputBar';
-import { AuthModal, UserProfile } from './components/AuthModal';
 import { ChatMessage } from './types';
 import { getSchemeById, detectSchemeFromText, PMUY_SCHEME } from './data/schemes';
 import { SchemeGuidance } from './components/SchemeGuidance';
@@ -16,9 +16,30 @@ export const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
 
-  // Optional user authentication state
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  // User authentication state with local persistence
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('saha_user_profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const handleLoginSuccess = (profile: UserProfile) => {
+    setUser(profile);
+    try {
+      localStorage.setItem('saha_user_profile', JSON.stringify(profile));
+    } catch {}
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    try {
+      localStorage.removeItem('saha_user_profile');
+    } catch {}
+  };
 
   // Voice recognition and speech synthesis
   const {
@@ -54,15 +75,16 @@ export const App: React.FC = () => {
     }
   };
 
-  // Send text message to server-side endpoint
+  // Send text message to server-side endpoint with timeout handling
   const handleSendMessage = async (userText: string) => {
-    if (!userText.trim()) return;
+    const trimmedText = userText.trim();
+    if (!trimmedText) return;
 
     setError(null);
-    setLastUserMessage(userText);
+    setLastUserMessage(trimmedText);
 
     // Auto-tune speech recognition language based on user's script
-    const langCode = detectLanguageCodeFromText(userText);
+    const langCode = detectLanguageCodeFromText(trimmedText);
     if (langCode !== 'en-IN') {
       setLanguage(langCode);
     }
@@ -70,7 +92,7 @@ export const App: React.FC = () => {
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      text: userText,
+      text: trimmedText,
       timestamp: new Date(),
     };
 
@@ -78,10 +100,15 @@ export const App: React.FC = () => {
     setMessages(newMessages);
     setIsLoading(true);
 
+    // Abort controller for network timeout (60-second timeout for detailed AI answers)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           messages: newMessages.map((m) => ({
             role: m.role === 'assistant' ? 'assistant' : 'user',
@@ -89,6 +116,8 @@ export const App: React.FC = () => {
           })),
         }),
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -98,8 +127,22 @@ export const App: React.FC = () => {
       const data = await res.json();
       const replyText = data.text;
 
-      // Dynamically attach scheme card if user asked about any supported scheme
-      const matchedScheme = detectSchemeFromText(userText);
+      // Dynamically attach scheme card if a specific verified scheme has been identified
+      // Avoid attaching during open-ended discovery or clarifying questions
+      const lowerQuery = trimmedText.toLowerCase();
+      const isDiscoveryQuery =
+        lowerQuery.includes("don't know") ||
+        lowerQuery.includes('dont know') ||
+        lowerQuery.includes('not sure') ||
+        lowerQuery.includes('which scheme');
+
+      let matchedScheme = undefined;
+      if (!isDiscoveryQuery) {
+        matchedScheme = detectSchemeFromText(trimmedText);
+        if (!matchedScheme && !replyText.endsWith('?')) {
+          matchedScheme = detectSchemeFromText(replyText);
+        }
+      }
       const schemeCardId = matchedScheme ? matchedScheme.id : undefined;
 
       const botMessageId = `asst-${Date.now()}`;
@@ -113,9 +156,13 @@ export const App: React.FC = () => {
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (err: unknown) {
+      clearTimeout(timeoutId);
       console.error('Chat error:', err);
-      const errMsg = err instanceof Error ? err.message : 'An error occurred while connecting to server';
-      setError(`Notice: ${errMsg}`);
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Notice: The request took longer than expected due to a slow network. Please tap Retry.');
+      } else {
+        setError('Notice: Unable to connect to server. Please check your connection and tap Retry.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -142,8 +189,8 @@ export const App: React.FC = () => {
         onReset={handleReset}
         hasMessages={messages.length > 0}
         user={user}
-        onOpenAuth={() => setIsAuthOpen(true)}
-        onLogout={() => setUser(null)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {messages.length === 0 ? (
@@ -183,11 +230,11 @@ export const App: React.FC = () => {
         </>
       )}
 
-      {/* Optional Auth Modal */}
+      {/* Login & Sign-Up Authentication Modal */}
       <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onLoginSuccess={(profile) => setUser(profile)}
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
       />
     </div>
   );

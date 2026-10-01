@@ -2,6 +2,31 @@ import { SchemeData } from '../../types';
 
 export const PMMVY_SCHEME: SchemeData = {
   id: 'pm-matru-vandana-yojana',
+  schemeName: 'Pradhan Mantri Matru Vandana Yojana (PMMVY)',
+  purpose: 'Provide partial wage compensation and maternal nutrition cash incentives to pregnant and lactating mothers.',
+  intendedUsers: 'Pregnant women and lactating mothers (age 19+) for first two live births (special grant if 2nd is girl).',
+  basicEligibility: [
+    'Pregnant women and lactating mothers aged 19 years and above.',
+    'Excludes regular employees of Central/State Govt or PSUs.',
+  ],
+  requiredDocuments: [
+    'Mother and Child Protection (MCP) card',
+    'Woman’s Aadhaar Card',
+    'Husband’s Aadhaar Card',
+    'Bank Account Passbook (linked with Aadhaar)',
+  ],
+  benefitService: [
+    '₹5,000 in two installments for the 1st child via DBT.',
+    '₹6,000 for 2nd child if it is a girl child.',
+  ],
+  applicationSteps: [
+    'Step 1: Register at Anganwadi Centre or approved health facility.',
+    'Step 2: Submit Form 1A with MCP Card and Aadhaar.',
+    'Step 3: Receive 1st installment after ANC checkup.',
+    'Step 4: Receive 2nd installment after childbirth and initial immunizations.',
+  ],
+  officialUrl: 'https://pmmvy.wcd.gov.in',
+  source: 'Ministry of Women and Child Development (pmmvy.wcd.gov.in)',
   nameEn: 'Pradhan Mantri Matru Vandana Yojana (PMMVY)',
   nameTa: 'பிரதம மந்திரி மாத்ரு வந்தனா திட்டம் (PMMVY)',
   ministryEn: 'Ministry of Women and Child Development, Govt of India',
@@ -50,7 +75,6 @@ export const PMMVY_SCHEME: SchemeData = {
     'படி 4: குழந்தை பிறப்பு பதிவு மற்றும் முதல் தடுப்பூசிக்குப் பின் இரண்டாம் தவணை (₹2,000) வரவு வைக்கப்படும்.',
     'படி 5: pmmvy.wcd.gov.in இணையதளம் மூலமாகவும் ஆன்லைனில் விண்ணப்பிக்கலாம்.',
   ],
-  officialUrl: 'https://pmmvy.wcd.gov.in',
   helpline: '1800-11-6555 / 1098 (Women & Child Helpline)',
   isVerified: true,
   verificationSource: 'Ministry of Women and Child Development (pmmvy.wcd.gov.in)',

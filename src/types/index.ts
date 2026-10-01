@@ -24,6 +24,18 @@ export interface SchemeQuestion {
 
 export interface SchemeData {
   id: string;
+  // Core government resource schema
+  schemeName: string;
+  purpose: string;
+  intendedUsers: string;
+  basicEligibility: string[];
+  requiredDocuments: string[];
+  benefitService: string[];
+  applicationSteps: string[];
+  officialUrl: string;
+  source: string;
+
+  // Multilingual & guidance presentation fields
   nameEn: string;
   nameTa: string;
   ministryEn: string;
@@ -36,7 +48,6 @@ export interface SchemeData {
   documentsTa: string[];
   stepsEn: string[];
   stepsTa: string[];
-  officialUrl: string;
   helpline: string;
   isVerified: boolean;
   verificationSource: string;

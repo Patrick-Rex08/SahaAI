@@ -2,6 +2,15 @@ import { SchemeData } from '../../types';
 
 export const AYUSHMAN_SCHEME: SchemeData = {
   id: 'ayushman-bharat-pmjay',
+  schemeName: 'Ayushman Bharat (PM-JAY)',
+  purpose: 'Provide financial health protection against catastrophic hospital healthcare expenses.',
+  intendedUsers: 'Underprivileged, vulnerable, and low-income families identified via SECC / Priority Ration Card.',
+  basicEligibility: ['Deprived and vulnerable families under SECC / Priority Ration Card.', 'No restriction on family size or age.'],
+  requiredDocuments: ['Ration Card', 'Aadhaar Card of all family members'],
+  benefitService: ['₹5,00,000 cashless secondary and tertiary hospital treatment per family per year.', 'Covers 1,900+ procedures across 27,000+ empaneled hospitals.'],
+  applicationSteps: ['Step 1: Check name at beneficiary.nha.gov.in or helpline 14555.', 'Step 2: Visit CSC or Govt Hospital for e-KYC.', 'Step 3: Collect Ayushman Golden Card.'],
+  officialUrl: 'https://beneficiary.nha.gov.in',
+  source: 'National Health Authority, Ministry of Health and Family Welfare (pmjay.gov.in)',
   nameEn: 'Ayushman Bharat (PM-JAY)',
   nameTa: 'ஆயுஷ்மான் பாரத் (PM-JAY மருத்துவ காப்பீடு திட்டம்)',
   ministryEn: 'National Health Authority (NHA) & Ministry of Health and Family Welfare, Govt of India',
@@ -48,7 +57,6 @@ export const AYUSHMAN_SCHEME: SchemeData = {
     'படி 4: உங்கள் ஆயுஷ்மான் கார்டை (Golden Card) உடனடியாகப் பெற்றுக்கொள்ளவும்.',
     'படி 5: பட்டியலிடப்பட்ட மருத்துவமனைகளில் இந்த கார்டை காண்பித்து இலவச பணமில்லா சிகிச்சை பெறலாம்.',
   ],
-  officialUrl: 'https://beneficiary.nha.gov.in',
   helpline: '14555 / 1800-111-565 (National Health Toll-Free)',
   isVerified: true,
   verificationSource: 'National Health Authority (pmjay.gov.in)',

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, CheckCircle2, Phone, ShieldCheck, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, CheckCircle2, Phone, ShieldCheck, ArrowRight, User, RefreshCw } from 'lucide-react';
 
 export interface UserProfile {
   name: string;
@@ -15,11 +15,22 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [incomingSmsBanner, setIncomingSmsBanner] = useState<string | null>(null);
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (resendCountdown > 0) {
+      timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
 
   if (!isOpen) return null;
 
@@ -33,7 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         identifier: 'user@gmail.com',
       });
       onClose();
-    }, 600);
+    }, 500);
   };
 
   const handleFacebookAuth = () => {
@@ -46,39 +57,99 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         identifier: 'user@facebook.com',
       });
       onClose();
-    }, 600);
+    }, 500);
   };
 
-  const handleSendOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone || phone.trim().length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setErrorMessage('Please enter a valid 10-digit Indian mobile number.');
       return;
     }
+
     setErrorMessage(null);
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const res = await fetch('/api/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send', phone: cleanPhone }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send OTP verification code.');
+      }
+
       setOtpSent(true);
-    }, 500);
+      setResendCountdown(30);
+
+      // Display incoming SMS banner
+      if (data.otp) {
+        setIncomingSmsBanner(
+          `📲 SMS from GOV-SAHA: Your 6-digit verification code is ${data.otp}. Valid for 5 minutes.`
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error connecting to OTP service';
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otpCode || otpCode.trim().length < 4) {
-      setErrorMessage('Please enter a 4-digit verification OTP (e.g. 1234).');
+    const cleanOtp = otpCode.trim();
+    if (!cleanOtp || cleanOtp.length < 4) {
+      setErrorMessage('Please enter the 6-digit verification OTP code.');
       return;
     }
+
+    setErrorMessage(null);
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const res = await fetch('/api/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify',
+          phone: cleanPhone,
+          otp: cleanOtp,
+          name: name.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Invalid verification code.');
+      }
+
       onLoginSuccess({
-        name: `User (${phone.slice(-4)})`,
+        name: data.user?.name || (name.trim() || `Citizen (${cleanPhone.slice(-4)})`),
         authMethod: 'phone',
-        identifier: `+91 ${phone}`,
+        identifier: `+91 ${cleanPhone}`,
       });
       onClose();
-    }, 500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'OTP verification failed';
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAutoFill = () => {
+    if (incomingSmsBanner) {
+      const match = incomingSmsBanner.match(/\b\d{6}\b/);
+      if (match) {
+        setOtpCode(match[0]);
+      }
+    }
   };
 
   return (
@@ -99,15 +170,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         </button>
 
         {/* Modal Header */}
-        <div className="p-6 pb-4 text-center">
+        <div className="p-6 pb-3 text-center">
           <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl mb-2">
             🤝
           </div>
           <h2 id="auth-modal-title" className="text-xl font-bold text-slate-900">
-            {activeTab === 'login' ? 'Welcome Back' : 'Create an Account'}
+            {activeTab === 'login' ? 'Welcome Back to Saha' : 'Create an Account on Saha'}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Login is completely optional. You can always use Saha as a guest!
+            Access welfare eligibility, documents, and application status anytime
           </p>
 
           {/* Tabs: Login / Sign Up */}
@@ -143,8 +214,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
 
         {/* Error notification */}
         {errorMessage && (
-          <div className="mx-6 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
+          <div className="mx-6 mb-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
             {errorMessage}
+          </div>
+        )}
+
+        {/* Simulated Incoming SMS Notification Banner */}
+        {incomingSmsBanner && (
+          <div className="mx-6 mb-3 p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-start gap-3 shadow-md animate-bounce-short">
+            <div className="text-xl">📩</div>
+            <div className="flex-1">
+              <div className="text-xs font-bold text-emerald-900 flex items-center justify-between">
+                <span>SMS Received</span>
+                <span className="text-[10px] text-emerald-600 font-normal">Just now</span>
+              </div>
+              <p className="text-xs text-emerald-800 mt-0.5 font-medium leading-relaxed">
+                {incomingSmsBanner}
+              </p>
+              <button
+                type="button"
+                onClick={handleAutoFill}
+                className="mt-2 text-xs font-bold text-emerald-800 bg-emerald-200 hover:bg-emerald-300 px-3 py-1 rounded-lg transition-colors flex items-center gap-1"
+              >
+                <span>⚡ Auto-fill Code</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -157,9 +251,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
               type="button"
               onClick={handleGoogleAuth}
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 rounded-2xl font-semibold text-sm text-slate-700 transition-all shadow-xs min-h-[48px]"
+              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 rounded-2xl font-semibold text-sm text-slate-700 transition-all shadow-xs min-h-[44px]"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -185,9 +279,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
               type="button"
               onClick={handleFacebookAuth}
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-2xl font-semibold text-sm transition-all shadow-xs min-h-[48px]"
+              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-2xl font-semibold text-sm transition-all shadow-xs min-h-[44px]"
             >
-              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
               <span>{activeTab === 'login' ? 'Continue with Facebook' : 'Sign up with Facebook'}</span>
@@ -197,7 +291,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
           {/* Divider */}
           <div className="flex items-center gap-3 my-2">
             <div className="flex-1 h-px bg-slate-200"></div>
-            <span className="text-xs font-semibold text-slate-400 uppercase">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               Or with Mobile Number
             </span>
             <div className="flex-1 h-px bg-slate-200"></div>
@@ -206,6 +300,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
           {/* Mobile Phone / OTP Form */}
           {!otpSent ? (
             <form onSubmit={handleSendOtp} className="space-y-3">
+              {activeTab === 'signup' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Your Name (Optional)
+                  </label>
+                  <div className="flex items-center gap-2 border border-slate-200 rounded-2xl px-3 py-2.5 focus-within:border-indigo-600 bg-white">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Priya Devi"
+                      className="flex-1 text-sm text-slate-900 outline-none bg-transparent"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Mobile Number
@@ -229,17 +341,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
                 disabled={isLoading || phone.length < 10}
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-2xl font-bold text-sm transition-all shadow-md min-h-[48px] flex items-center justify-center gap-2"
               >
-                <span>Send OTP (Get Code)</span>
+                <span>{isLoading ? 'Sending SMS...' : 'Send OTP to Mobile'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-3">
               <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs text-indigo-900 flex items-center justify-between">
-                <span>Code sent to +91 {phone}</span>
+                <span>Code sent to <strong>+91 {phone}</strong></span>
                 <button
                   type="button"
-                  onClick={() => setOtpSent(false)}
+                  onClick={() => {
+                    setOtpSent(false);
+                    setOtpCode('');
+                    setIncomingSmsBanner(null);
+                  }}
                   className="font-bold underline text-indigo-700 ml-2"
                 >
                   Change
@@ -248,15 +364,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Enter 4-Digit OTP
+                  Enter 6-Digit OTP Code
                 </label>
                 <input
                   type="text"
                   maxLength={6}
                   value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="Enter OTP (e.g. 1234)"
-                  className="w-full text-center tracking-widest text-lg font-bold border border-slate-200 rounded-2xl py-2.5 focus:border-indigo-600 outline-none bg-white"
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 6-digit OTP"
+                  className="w-full text-center tracking-widest text-xl font-bold border border-slate-200 rounded-2xl py-3 focus:border-indigo-600 outline-none bg-white"
+                  autoFocus
                 />
               </div>
 
@@ -266,8 +383,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-2xl font-bold text-sm transition-all shadow-md min-h-[48px] flex items-center justify-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Verify & {activeTab === 'login' ? 'Login' : 'Sign Up'}</span>
+                <span>{isLoading ? 'Verifying...' : `Verify & ${activeTab === 'login' ? 'Login' : 'Sign Up'}`}</span>
               </button>
+
+              <div className="flex items-center justify-between text-xs pt-1 px-1">
+                <span className="text-slate-400">Didn't receive code?</span>
+                <button
+                  type="button"
+                  disabled={isLoading || resendCountdown > 0}
+                  onClick={() => handleSendOtp()}
+                  className="font-semibold text-indigo-600 hover:text-indigo-800 disabled:text-slate-400 flex items-center gap-1"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                  <span>{resendCountdown > 0 ? `Resend in ${resendCountdown}s` : 'Resend OTP'}</span>
+                </button>
+              </div>
             </form>
           )}
 
@@ -284,9 +414,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         </div>
 
         {/* Security badge footer */}
-        <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-500">
+        <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-500">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Your personal information is secure and never shared.</span>
+          <span>Your personal data is encrypted, secure, and private.</span>
         </div>
       </div>
     </div>

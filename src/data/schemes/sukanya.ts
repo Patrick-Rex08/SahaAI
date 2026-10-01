@@ -2,6 +2,15 @@ import { SchemeData } from '../../types';
 
 export const SUKANYA_SCHEME: SchemeData = {
   id: 'sukanya-samriddhi-yojana',
+  schemeName: 'Sukanya Samriddhi Yojana (SSY)',
+  purpose: 'Long-term government savings scheme for girl child education and marriage.',
+  intendedUsers: 'Girl children up to age 10 (maximum 2 per family).',
+  basicEligibility: ['Girl child from birth up to age 10.', 'Must be opened by biological parents or legal guardian.'],
+  requiredDocuments: ['Girl child birth certificate', 'Parent/guardian Aadhaar and PAN Card', 'Address proof'],
+  benefitService: ['Guaranteed ~8.2% annual compound interest', '100% tax exemption under EEE', 'Minimum deposit ₹250/year'],
+  applicationSteps: ['Step 1: Visit Post Office or authorized bank.', 'Step 2: Submit SSY form with birth certificate.', 'Step 3: Deposit minimum ₹250 and collect passbook.'],
+  officialUrl: 'https://www.indiapost.gov.in',
+  source: 'Ministry of Finance, Government of India (indiapost.gov.in)',
   nameEn: 'Sukanya Samriddhi Yojana (SSY)',
   nameTa: 'சுகன்யா சம்ரித்தி திட்டம் (செல்வ மகள் சேமிப்புத் திட்டம்)',
   ministryEn: 'Ministry of Finance & Ministry of Women and Child Development, Govt of India',
@@ -50,7 +59,6 @@ export const SUKANYA_SCHEME: SchemeData = {
     'படி 4: செல்வ மகள் சேமிப்பு படிவத்தை பூர்த்தி செய்து ஆரம்ப தொகையாக குறைந்தது ₹250 செலுத்தவும்.',
     'படி 5: பாஸ்புக் பெற்றுக்கொண்டு ஆண்டுதோறும் உங்கள் சேமிப்பை தொடரலாம்.',
   ],
-  officialUrl: 'https://www.indiapost.gov.in',
   helpline: '1800-266-6868 (India Post Helpline)',
   isVerified: true,
   verificationSource: 'National Savings Institute, Ministry of Finance (indiapost.gov.in)',

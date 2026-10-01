@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import dotenv from 'dotenv';
 import { handleChatRequest } from './api/chat.ts';
 import { handleTtsRequest } from './api/tts.ts';
+import { handleOtpRequest } from './api/otp.ts';
 
 // Load .env variables locally
 dotenv.config();
@@ -12,6 +13,36 @@ function chatApiPlugin(): Plugin {
   return {
     name: 'chat-and-tts-api-middleware',
     configureServer(server) {
+      // POST /api/otp
+      server.middlewares.use('/api/otp', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        let bodyRaw = '';
+        req.on('data', (chunk) => {
+          bodyRaw += chunk;
+        });
+
+        req.on('end', async () => {
+          try {
+            const body = JSON.parse(bodyRaw);
+            const response = await handleOtpRequest(body);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify(response));
+          } catch (err: unknown) {
+            console.error('API /api/otp error:', err);
+            const message = err instanceof Error ? err.message : 'OTP error';
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: message }));
+          }
+        });
+      });
+
       // POST /api/chat
       server.middlewares.use('/api/chat', async (req, res) => {
         if (req.method !== 'POST') {

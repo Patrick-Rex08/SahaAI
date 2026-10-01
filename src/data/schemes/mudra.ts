@@ -2,6 +2,15 @@ import { SchemeData } from '../../types';
 
 export const MUDRA_SCHEME: SchemeData = {
   id: 'pm-mudra-yojana',
+  schemeName: 'Pradhan Mantri Mudra Yojana (PMMY)',
+  purpose: 'Provide collateral-free micro-business loans up to ₹10 Lakh to women entrepreneurs and small businesses.',
+  intendedUsers: 'Women starting or expanding non-farm micro-enterprises, small shops, tailoring, food, or crafts.',
+  basicEligibility: ['Non-farm micro-enterprise or small business owner.', 'Indian citizen aged 18+ with viable business proposal.'],
+  requiredDocuments: ['Aadhaar Card', 'PAN Card', 'Residence Proof', 'Business estimate / machinery quotation'],
+  benefitService: ['100% collateral-free loans up to ₹10 Lakh', 'Shishu (up to ₹50K), Kishore (₹50K-₹5L), Tarun (₹5L-₹10L)', 'Mudra Debit Card'],
+  applicationSteps: ['Step 1: Choose loan tier.', 'Step 2: Collect Aadhaar, PAN, and quotation.', 'Step 3: Visit bank or apply at udyamimitra.in.'],
+  officialUrl: 'https://www.mudra.org.in',
+  source: 'Micro Units Development & Refinance Agency Ltd (mudra.org.in)',
   nameEn: 'Pradhan Mantri Mudra Yojana (PMMY)',
   nameTa: 'பிரதம மந்திரி முத்ரா கடன் திட்டம் (PMMY)',
   ministryEn: 'Ministry of Finance, Govt of India',
@@ -52,7 +61,6 @@ export const MUDRA_SCHEME: SchemeData = {
     'படி 4: முத்ரா விண்ணப்ப படிவத்தை இலவசமாக பெற்று பூர்த்தி செய்து சமர்ப்பிக்கவும்.',
     'படி 5: வங்கி சரிபார்ப்பிற்கு பிறகு கடன் தொகை உங்கள் கணக்கில் நேரடியாக வழங்கப்படும்.',
   ],
-  officialUrl: 'https://www.mudra.org.in',
   helpline: '1800-180-1111 (National Toll-Free Helpline)',
   isVerified: true,
   verificationSource: 'Micro Units Development & Refinance Agency Ltd (mudra.org.in)',
