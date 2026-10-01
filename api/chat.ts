@@ -1,8 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 
-// Ensure .env variables are loaded server-side
-dotenv.config();
+// Ensure .env variables are loaded server-side with override
+dotenv.config({ override: true });
 
 const SAHA_SYSTEM_INSTRUCTION = `
 You are "Saha", an empathetic, respectful, and accessible AI citizen companion designed to help women across all of India understand and access government schemes, services, and opportunities independently.
@@ -100,7 +100,7 @@ export async function handleChatRequest(body: ChatRequestBody): Promise<{ text: 
 
       if (audio && audio.data) {
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.5-flash',
           contents: [
             {
               role: 'user',
@@ -134,7 +134,7 @@ export async function handleChatRequest(body: ChatRequestBody): Promise<{ text: 
       }));
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash',
         contents,
         config: {
           systemInstruction: SAHA_SYSTEM_INSTRUCTION,
