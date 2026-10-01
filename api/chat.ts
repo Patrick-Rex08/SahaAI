@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
 const SAHA_SYSTEM_INSTRUCTION = `
-You are "Saha", an empathetic, respectful, and accessible AI companion designed to help women across all of India understand and access government schemes, services, and opportunities independently.
+You are "Saha", an empathetic, respectful, and accessible AI citizen companion designed to help women across all of India understand and access government schemes, services, and opportunities independently.
 
 MULTILINGUAL CAPABILITIES (CORE PRINCIPLE):
 - Saha is built for all of India. You MUST NOT treat English or Tamil as default.
@@ -25,19 +25,19 @@ MULTILINGUAL CAPABILITIES (CORE PRINCIPLE):
 - DO NOT show or ask for language selection. Never ask what language they are comfortable in.
 - Avoid bureaucratic jargon and intimidating paragraphs. Keep replies simple, conversational, and respectful.
 
-MULTIMODAL AUDIO PROCESSING:
-- When audio input is provided:
-  - Listen directly to the user's voice and automatically identify their spoken language and dialect.
-  - Understand their intent and respond helpfully in that same language.
+CONVERSATION CONTEXT & FOLLOW-UP CONTINUITY:
+- The user may ask short follow-up questions (e.g., "Gas connection", "What documents?", "How to apply?", "ஆவணங்கள் என்ன?", "दस्तावेज क्या हैं?").
+- Always connect follow-up questions to the ongoing conversation topic. For example, if the user previously asked for government help and now says "Gas connection", understand that they are looking for government gas assistance (PM Ujjwala Yojana).
 
-GROUNDED SCHEME FACTS (PM UJJWALA YOJANA - PMUY 2.0):
-ONLY when the user specifically asks about cooking gas, gas connections, stoves, or Ujjwala:
-- Benefits: Deposit-free LPG gas connection, 1st cylinder refill free, free gas stove (hotplate) & safety hose pipe.
-- Eligibility: Adult woman (18+), poor household (BPL / SECC / priority ration card / deprivation declaration), NO existing LPG connection in the household.
-- Documents: State Ration Card / family composition certificate, Applicant woman's Aadhaar Card, Bank passbook copy, Aadhaar of adult family members.
-- Application: Nearest LPG agency (Indane, Bharat Gas, HP Gas) with KYC form, or online at pmuy.gov.in.
-- Helpline: 1800-266-6696 or 1906.
-Translate and explain these facts simply in whichever language the user used.
+STRICT GROUNDING & ACCURACY RULES:
+- DO NOT invent or fabricate scheme eligibility criteria, document requirements, application procedures, or official links.
+- For Pradhan Mantri Ujjwala Yojana (PMUY 2.0), use ONLY these verified facts:
+  • Eligibility: Adult woman (age 18+), from a poor/deprived household (BPL/SECC/priority ration card), NO existing LPG connection in the household.
+  • Benefits: 100% deposit-free LPG gas connection, 1st cylinder refill completely free, free gas stove (hotplate) & safety hose pipe.
+  • Required Documents: State Ration Card / family composition certificate, Applicant woman's Aadhaar Card, Bank passbook copy, Aadhaar of adult family members.
+  • How to Apply: Visit nearest LPG distributor (Indane, Bharat Gas, HP Gas) with KYC form, or online via verified portal pmuy.gov.in.
+  • Toll-Free Helpline: 1800-266-6696 or 1906.
+- For other schemes or unverified queries, provide helpful general guidance and clearly indicate when verified government confirmation is required. Never provide fake or unverified links.
 `;
 
 export interface ChatRequestBody {
@@ -61,56 +61,69 @@ export async function handleChatRequest(body: ChatRequestBody): Promise<{ text: 
 
   // 1. If GEMINI_API_KEY is available, use Gemini 2.5 Flash for multimodal multilingual intelligence
   if (apiKey && apiKey !== 'your_gemini_api_key_here' && apiKey.trim() !== '') {
-    const ai = new GoogleGenAI({ apiKey });
+    try {
+      const ai = new GoogleGenAI({ apiKey });
 
-    // Handle multimodal audio recording directly
-    if (audio && audio.data) {
+      // Handle multimodal audio recording directly
+      if (audio && audio.data) {
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: 'Listen to the user query in this voice recording. Automatically identify the Indian language or dialect spoken (Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Odia, Punjabi, Assamese, Urdu, Sindhi, or English). Understand the user intent and reply directly and helpfully in that same language. Do not ask for language preference.',
+                },
+                {
+                  inlineData: {
+                    mimeType: audio.mimeType || 'audio/webm',
+                    data: audio.data,
+                  },
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: SAHA_SYSTEM_INSTRUCTION,
+            temperature: 0.7,
+          },
+        });
+
+        if (response.text) {
+          return { text: response.text };
+        }
+      }
+
+      // Standard multi-turn conversation with memory
+      const contents = messages.map((m: any) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.text || m.content || '' }],
+      }));
+
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: 'Listen to the user query in this voice recording. Automatically identify the Indian language or dialect spoken (Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Odia, Punjabi, Assamese, Urdu, Sindhi, or English). Understand the user intent and reply directly and helpfully in that same language. Do not ask for language preference.',
-              },
-              {
-                inlineData: {
-                  mimeType: audio.mimeType || 'audio/webm',
-                  data: audio.data,
-                },
-              },
-            ],
-          },
-        ],
+        contents,
         config: {
           systemInstruction: SAHA_SYSTEM_INSTRUCTION,
           temperature: 0.7,
         },
       });
 
-      return { text: response.text || '' };
+      if (response.text) {
+        return { text: response.text };
+      }
+    } catch (geminiError: unknown) {
+      console.warn('Gemini API request failed, falling back to intelligent offline multilingual handler:', geminiError);
+      // Graceful fallback to offline multilingual dataset if API key quota/network fails
     }
-
-    // Standard text conversation
-    const contents = messages.map((m: any) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.text || m.content || '' }],
-    }));
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents,
-      config: {
-        systemInstruction: SAHA_SYSTEM_INSTRUCTION,
-        temperature: 0.7,
-      },
-    });
-
-    return { text: response.text || '' };
   }
 
-  // 2. Intelligent multilingual fallback when API key is not yet set
+  // 2. Intelligent multilingual fallback when API key is not yet set or during network failure
+  const fullConversationHistory = messages
+    ? messages.map((m: any) => (m.text || m.content || '')).join(' ').toLowerCase()
+    : '';
+
   const lastMsg = messages && messages.length > 0 ? messages[messages.length - 1] : null;
   const lastMessage = lastMsg ? (lastMsg.text || (lastMsg as any).content || '') : '';
   const text = lastMessage.trim();
@@ -127,6 +140,47 @@ export async function handleChatRequest(body: ChatRequestBody): Promise<{ text: 
   const isOdia = /[\u0B00-\u0B7F]/.test(text);
   const isUrdu = /[\u0600-\u06FF]/.test(text);
   const isDevanagari = /[\u0900-\u097F]/.test(text); // Hindi, Marathi
+
+  // Follow-up context handling (multi-turn conversation memory)
+  const isOngoingGasTopic =
+    fullConversationHistory.includes('gas') ||
+    fullConversationHistory.includes('cylinder') ||
+    fullConversationHistory.includes('ujjwala') ||
+    fullConversationHistory.includes('pmuy') ||
+    fullConversationHistory.includes('गैस') ||
+    fullConversationHistory.includes('எரிவாயு');
+
+  const isDocumentFollowUp =
+    isOngoingGasTopic &&
+    (lower.includes('document') ||
+      lower.includes('documents') ||
+      lower.includes('aadhaar') ||
+      lower.includes('ration') ||
+      lower.includes('kaagaz') ||
+      lower.includes('aavanam') ||
+      lower.includes('दस्तावेज') ||
+      lower.includes('ஆவணங்கள்'));
+
+  if (isDocumentFollowUp) {
+    if (isTamil) {
+      return {
+        text: 'பிரதம மந்திரி உஜ்வாலா திட்டத்திற்கு (PMUY 2.0) தேவையான ஆவணங்கள்:\n1. குடும்ப அட்டை (Ration Card) அல்லது குடும்ப உறுப்பினர் சான்றிதழ்\n2. விண்ணப்பதாரர் பெண்ணின் ஆதார் அட்டை\n3. குடும்பத்தில் உள்ள வயது வந்தோரின் ஆதார் நகல்கள்\n4. வங்கி கணக்கு புத்தக நகல் (Bank Passbook)\n5. பாஸ்போர்ட் அளவு புகைப்படம்',
+      };
+    }
+    if (isDevanagari) {
+      return {
+        text: 'प्रधानमंत्री उज्ज्वला योजना 2.0 के लिए आवश्यक दस्तावेज:\n1. राशन कार्ड (या परिवार संरचना प्रमाण पत्र)\n2. महिला आवेदक का आधार कार्ड\n3. परिवार के सभी 18+ सदस्यों का आधार कार्ड\n4. बैंक पासबुक की फोटोकॉपी (सब्सिडी हेतु)\n5. पासपोर्ट साइज फोटो',
+      };
+    }
+    if (lower.includes('venum') || lower.includes('theva')) {
+      return {
+        text: 'Ujjwala 2.0 gas connection-ku thevaiyana documents:\n1. Ration Card\n2. Vinnappadharar pennin Aadhaar Card\n3. Kudumbathu periyavanga ellaroda Aadhaar copy\n4. Bank Passbook copy\n5. Passport size photo',
+      };
+    }
+    return {
+      text: 'Key documents required for PM Ujjwala Yojana (PMUY 2.0):\n1. State Ration Card (or Family Composition Certificate)\n2. Applicant Woman’s Aadhaar Card\n3. Aadhaar copies of all adult family members\n4. Bank Passbook copy (linked to Aadhaar)\n5. Passport-size photograph',
+    };
+  }
 
   // (A) Gas / Cylinder / Stove / PMUY Queries
   const isGasQuery =

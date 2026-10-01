@@ -72,6 +72,8 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
 
   const recognitionRef = useRef<any>(null);
   const isStartingRef = useRef(false);
+  const silenceTimerRef = useRef<any>(null);
+  const maxSilenceTimerRef = useRef<any>(null);
 
   // 1. Inspect browser compatibility & secure context on mount
   useEffect(() => {
@@ -93,27 +95,9 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       setIsSupported(true);
     }
 
-    // Inspect microphone permission state silently via Permissions API if available
-    if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions
-        .query({ name: 'microphone' as PermissionName })
-        .then((permissionStatus) => {
-          if (permissionStatus.state === 'denied') {
-            setIsPermissionDenied(true);
-          }
-          permissionStatus.onchange = () => {
-            setIsPermissionDenied(permissionStatus.state === 'denied');
-            if (permissionStatus.state === 'granted') {
-              setErrorMessage(null);
-            }
-          };
-        })
-        .catch(() => {
-          // Permissions API for microphone is not supported in all browsers; ignore silently
-        });
-    }
-
     return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (maxSilenceTimerRef.current) clearTimeout(maxSilenceTimerRef.current);
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -133,8 +117,8 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
 
     const recognition = new SpeechRecognitionClass();
 
-    // Stops automatically when user finishes speaking (per UX requirement #7)
-    recognition.continuous = false;
+    // Keep active continuously until speech ends
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     recognition.lang = currentLanguage;
@@ -143,40 +127,70 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       setIsListening(true);
       isStartingRef.current = false;
       setErrorMessage(null);
+
+      // Max safety timeout: if 12s pass with no speech at all, stop cleanly
+      if (maxSilenceTimerRef.current) clearTimeout(maxSilenceTimerRef.current);
+      maxSilenceTimerRef.current = setTimeout(() => {
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch {
+            // ignore
+          }
+        }
+      }, 12000);
     };
 
     recognition.onresult = (event: any) => {
+      // Clear safety timeout once sound is captured
+      if (maxSilenceTimerRef.current) {
+        clearTimeout(maxSilenceTimerRef.current);
+        maxSilenceTimerRef.current = null;
+      }
+
       let interim = '';
-      let final = '';
+      let finalChunk = '';
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         const item = event.results[i];
         if (item.isFinal) {
-          final += item[0].transcript;
+          finalChunk += item[0].transcript;
         } else {
           interim += item[0].transcript;
         }
       }
 
-      if (final) {
-        setTranscript((prev) => (prev ? `${prev} ${final}`.trim() : final.trim()));
-        setInterimTranscript('');
-      } else {
-        setInterimTranscript(interim);
+      if (finalChunk) {
+        setTranscript((prev) => (prev ? `${prev} ${finalChunk}`.trim() : finalChunk.trim()));
       }
+      setInterimTranscript(interim);
+
+      // Auto-stop when user finishes speaking (1.8s of silence after speech)
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch {
+            // ignore
+          }
+        }
+      }, 1800);
     };
 
     recognition.onerror = (event: any) => {
-      isStartingRef.current = false;
-      setIsListening(false);
-
       const errorCode = event.error;
 
       // Handle benign silence without alarming the user
       if (errorCode === 'no-speech') {
-        setErrorMessage('No speech was detected. Tap the microphone and speak again, or type below.');
+        // Continuous mode handles silence gracefully; ignore
         return;
       }
+
+      isStartingRef.current = false;
+      setIsListening(false);
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (maxSilenceTimerRef.current) clearTimeout(maxSilenceTimerRef.current);
 
       if (errorCode === 'aborted') {
         return;
@@ -189,7 +203,6 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       } else if (errorCode === 'network') {
         setErrorMessage('Voice service connection issue. This can happen with strict ad-blockers or privacy browsers. You can type your question directly below.');
       } else if (errorCode === 'language-not-supported') {
-        // If regional language routing fails, fall back to Indian English
         try {
           recognition.lang = 'en-IN';
         } catch {
@@ -203,12 +216,14 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
     recognition.onend = () => {
       isStartingRef.current = false;
       setIsListening(false);
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (maxSilenceTimerRef.current) clearTimeout(maxSilenceTimerRef.current);
     };
 
     return recognition;
   }, [currentLanguage]);
 
-  // 3. User taps microphone to start listening
+  // 3. User taps microphone to start listening (synchronous activation)
   const startListening = useCallback(async () => {
     if (isStartingRef.current || isListening) return;
     isStartingRef.current = true;
@@ -227,25 +242,7 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       return;
     }
 
-    // Step A: Request microphone hardware permission explicitly if needed
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // CRUCIAL: Immediately stop and release hardware tracks so SpeechRecognition has free device access!
-        stream.getTracks().forEach((track) => track.stop());
-        setIsPermissionDenied(false);
-      } catch (err: unknown) {
-        isStartingRef.current = false;
-        const errName = (err as any)?.name;
-        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-          setIsPermissionDenied(true);
-          setErrorMessage('Microphone access was denied. Please allow microphone permissions in your browser, or type below.');
-          return;
-        }
-      }
-    }
-
-    // Step B: Abort any leftover instance cleanly
+    // Abort any leftover instance cleanly
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
@@ -255,7 +252,7 @@ export const useSpeechRecognition = (initialLang?: string): SpeechRecognitionHoo
       recognitionRef.current = null;
     }
 
-    // Step C: Build fresh recognition instance and start listening
+    // Build fresh recognition instance and start listening immediately (synchronous user gesture)
     const recognition = buildRecognitionInstance();
     if (!recognition) {
       isStartingRef.current = false;
