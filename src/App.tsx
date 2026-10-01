@@ -5,7 +5,7 @@ import { ChatArea } from './components/ChatArea';
 import { InputBar } from './components/InputBar';
 import { AuthModal, UserProfile } from './components/AuthModal';
 import { ChatMessage } from './types';
-import { PMUY_SCHEME } from './data/schemes/pmuy';
+import { getSchemeById, detectSchemeFromText, PMUY_SCHEME } from './data/schemes';
 import { SchemeGuidance } from './components/SchemeGuidance';
 import { useSpeechRecognition, detectLanguageCodeFromText } from './hooks/useSpeechRecognition';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
@@ -98,25 +98,9 @@ export const App: React.FC = () => {
       const data = await res.json();
       const replyText = data.text;
 
-      // ONLY attach scheme card if the USER specifically asked about gas/cylinder/Ujjwala
-      const userLower = userText.toLowerCase();
-      const isGasQuery =
-        userLower.includes('gas') ||
-        userLower.includes('cylinder') ||
-        userLower.includes('aduppu') ||
-        userLower.includes('chulha') ||
-        userLower.includes('stove') ||
-        userLower.includes('ujjwala') ||
-        userLower.includes('pmuy') ||
-        userLower.includes('எரிவாயு') ||
-        userLower.includes('உஜ்வாலா') ||
-        userLower.includes('गैस') ||
-        userLower.includes('उज्ज्वला') ||
-        userLower.includes('గ్యాస్') ||
-        userLower.includes('ಗ್ಯಾಸ್') ||
-        userLower.includes('গ্যাস');
-
-      const schemeCardId = isGasQuery ? PMUY_SCHEME.id : undefined;
+      // Dynamically attach scheme card if user asked about any supported scheme
+      const matchedScheme = detectSchemeFromText(userText);
+      const schemeCardId = matchedScheme ? matchedScheme.id : undefined;
 
       const botMessageId = `asst-${Date.now()}`;
       const botMessage: ChatMessage = {
@@ -181,7 +165,10 @@ export const App: React.FC = () => {
             onRetry={handleRetry}
             speakingMessageId={speakingId}
             onSpeak={speak}
-            renderSchemeCard={() => <SchemeGuidance scheme={PMUY_SCHEME} />}
+            renderSchemeCard={(cardId) => {
+              const scheme = getSchemeById(cardId) || PMUY_SCHEME;
+              return <SchemeGuidance scheme={scheme} />;
+            }}
           />
 
           <InputBar
